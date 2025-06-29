@@ -86,7 +86,28 @@ export const useAlgorand = () => {
     try {
       console.log('Attempting to connect to Pera Wallet...');
       
-      // Request connection to Pera Wallet
+      // Check if wallet is already connected
+      if (peraWallet.connector?.connected) {
+        console.log('Wallet already connected, using existing session');
+        const accounts = peraWallet.connector.accounts || [];
+        
+        if (accounts.length === 0) {
+          throw new Error('No accounts found in existing session. Please reconnect your wallet.');
+        }
+        
+        setState(prev => ({
+          ...prev,
+          isConnected: true,
+          accounts,
+          loading: false
+        }));
+
+        console.log('Using existing connection:', accounts[0]);
+        await fetchBalance(accounts[0]);
+        return;
+      }
+      
+      // Request new connection to Pera Wallet
       const accounts = await peraWallet.connect();
       
       if (!accounts || accounts.length === 0) {
