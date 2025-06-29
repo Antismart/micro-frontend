@@ -12,7 +12,7 @@ interface CoverageCardProps {
 }
 
 export const CoverageCard: React.FC<CoverageCardProps> = ({ crop, onPurchase, loading }) => {
-  const [coverageAmount, setCoverageAmount] = useState(500);
+  const [coverageAmount, setCoverageAmount] = useState(5); // Start with 5 ALGO
   const [duration, setDuration] = useState(90);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -81,14 +81,14 @@ export const CoverageCard: React.FC<CoverageCardProps> = ({ crop, onPurchase, lo
           <Slider
             value={[coverageAmount]}
             onValueChange={(value) => setCoverageAmount(value[0])}
-            max={2000}
-            min={100}
-            step={50}
+            max={8} // Maximum 8 ALGO for testing
+            min={1} // Minimum 1 ALGO
+            step={0.5} // 0.5 ALGO increments
             className="mb-2"
           />
           <div className="flex justify-between text-xs text-gray-500">
-            <span>100 ALGO</span>
-            <span>2,000 ALGO</span>
+            <span>1 ALGO</span>
+            <span>8 ALGO</span>
           </div>
         </div>
 
@@ -122,15 +122,15 @@ export const CoverageCard: React.FC<CoverageCardProps> = ({ crop, onPurchase, lo
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Total Premium:</span>
-              <span className="font-medium">{premiumAmount.toFixed(2)} ALGO</span>
+              <span className="font-medium">{premiumAmount.toFixed(3)} ALGO</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Monthly Cost:</span>
-              <span className="font-medium">{monthlyPremium.toFixed(2)} ALGO</span>
+              <span className="font-medium">{monthlyPremium.toFixed(3)} ALGO</span>
             </div>
             <div className="flex justify-between border-t pt-2">
               <span className="font-medium text-gray-900">You Pay Now:</span>
-              <span className="font-bold text-green-600">{premiumAmount.toFixed(2)} ALGO</span>
+              <span className="font-bold text-green-600">{premiumAmount.toFixed(3)} ALGO</span>
             </div>
           </div>
         </div>

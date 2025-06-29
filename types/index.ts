@@ -17,6 +17,7 @@ export interface CropType {
   name: string;
   minRainfall: number; // mm per month
   maxTemperature: number; // celsius
+  maxDailyRainfall: number; // mm per day
   premiumRate: number; // percentage of coverage
   icon: string;
 }

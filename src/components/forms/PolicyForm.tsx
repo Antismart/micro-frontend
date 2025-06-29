@@ -16,7 +16,7 @@ interface PolicyFormProps {
 export const PolicyForm: React.FC<PolicyFormProps> = ({ onSubmit, loading, error }) => {
   const [formData, setFormData] = useState({
     cropType: '',
-    coverageAmount: '',
+    coverageAmount: '5', // Default to 5 ALGO
     duration: '90', // days
     latitude: '',
     longitude: '',
@@ -129,8 +129,9 @@ export const PolicyForm: React.FC<PolicyFormProps> = ({ onSubmit, loading, error
             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="number"
-              min="100"
-              step="50"
+              min="1"
+              max="8"
+              step="0.5"
               value={formData.coverageAmount}
               onChange={(e) => setFormData(prev => ({ ...prev, coverageAmount: e.target.value }))}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -138,9 +139,12 @@ export const PolicyForm: React.FC<PolicyFormProps> = ({ onSubmit, loading, error
               required
             />
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Range: 1 - 8 ALGO for testing
+          </p>
           {premiumAmount > 0 && (
             <p className="text-sm text-gray-600 mt-1">
-              Premium: <strong>{premiumAmount.toFixed(2)} ALGO</strong>
+              Premium: <strong>{premiumAmount.toFixed(3)} ALGO</strong>
             </p>
           )}
         </div>
@@ -222,7 +226,7 @@ export const PolicyForm: React.FC<PolicyFormProps> = ({ onSubmit, loading, error
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Coverage Amount:</span>
-                <span className="font-medium">{coverageAmount.toLocaleString()} ALGO</span>
+                <span className="font-medium">{coverageAmount} ALGO</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Premium Rate:</span>
@@ -234,7 +238,7 @@ export const PolicyForm: React.FC<PolicyFormProps> = ({ onSubmit, loading, error
               </div>
               <div className="flex justify-between border-t pt-2 mt-2">
                 <span className="text-gray-900 font-medium">Premium Due:</span>
-                <span className="text-green-600 font-bold">{premiumAmount.toFixed(2)} ALGO</span>
+                <span className="text-green-600 font-bold">{premiumAmount.toFixed(3)} ALGO</span>
               </div>
             </div>
           </div>

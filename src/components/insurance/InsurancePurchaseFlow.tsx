@@ -45,9 +45,9 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
   const [selectedCoverage, setSelectedCoverage] = useState<CoverageOption | null>(null);
   const [policyDetails, setPolicyDetails] = useState<PolicyDetails>({
     coverageType: '',
-    coverageAmount: 1000,
+    coverageAmount: 5, // Start with 5 ALGO
     duration: 90,
-    deductible: 100,
+    deductible: 0.5, // 0.5 ALGO deductible
     additionalRiders: []
   });
   const [premiumCalculation, setPremiumCalculation] = useState({
@@ -64,8 +64,8 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
       description: 'Weather-based crop protection',
       icon: '🌾',
       baseRate: 0.08,
-      minCoverage: 100,
-      maxCoverage: 50000,
+      minCoverage: 1,
+      maxCoverage: 8,
       features: ['Weather triggers', 'Automatic payouts', 'Real-time monitoring', 'Yield protection']
     },
     {
@@ -74,8 +74,8 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
       description: 'Parametric weather coverage',
       icon: '🌦️',
       baseRate: 0.06,
-      minCoverage: 500,
-      maxCoverage: 25000,
+      minCoverage: 2,
+      maxCoverage: 6,
       features: ['Temperature protection', 'Rainfall coverage', 'Wind damage', 'Hail protection']
     },
     {
@@ -84,8 +84,8 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
       description: 'Harvest yield guarantee',
       icon: '📊',
       baseRate: 0.10,
-      minCoverage: 1000,
-      maxCoverage: 100000,
+      minCoverage: 3,
+      maxCoverage: 8,
       features: ['Yield guarantee', 'Market price protection', 'Quality coverage', 'Revenue insurance']
     }
   ];
@@ -121,7 +121,11 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
 
   const handleCoverageSelect = (coverage: CoverageOption) => {
     setSelectedCoverage(coverage);
-    setPolicyDetails(prev => ({ ...prev, coverageType: coverage.id }));
+    setPolicyDetails(prev => ({ 
+      ...prev, 
+      coverageType: coverage.id,
+      coverageAmount: Math.max(coverage.minCoverage, Math.min(coverage.maxCoverage, prev.coverageAmount))
+    }));
     const calculation = calculatePremium(coverage, policyDetails);
     setPremiumCalculation(calculation);
   };
@@ -146,7 +150,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
       }
       
       if (balance < premiumCalculation.totalPremium) {
-        throw new Error('Insufficient ALGO balance');
+        throw new Error(`Insufficient ALGO balance. Need ${premiumCalculation.totalPremium.toFixed(3)} ALGO, have ${balance.toFixed(3)} ALGO`);
       }
       
       // Create and sign the transaction
@@ -194,7 +198,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                   <p className="text-sm text-green-700 mt-1">
                     {currentAccount?.substring(0, 8)}...{currentAccount?.substring(currentAccount.length - 6)}
                   </p>
-                  <p className="text-sm text-green-700">Balance: {balance.toFixed(2)} ALGO</p>
+                  <p className="text-sm text-green-700">Balance: {balance.toFixed(3)} ALGO</p>
                 </div>
                 <Button variant="primary" onClick={() => setCurrentStep(2)} fullWidth>
                   Continue to Coverage Selection
@@ -242,7 +246,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                         <div>
                           <span className="text-gray-500">Coverage Range:</span>
                           <span className="font-medium ml-1">
-                            {option.minCoverage.toLocaleString()} - {option.maxCoverage.toLocaleString()} ALGO
+                            {option.minCoverage} - {option.maxCoverage} ALGO
                           </span>
                         </div>
                       </div>
@@ -288,12 +292,13 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                 <Input
                   type="number"
                   value={policyDetails.coverageAmount}
-                  onChange={(e) => handlePolicyDetailsChange('coverageAmount', parseInt(e.target.value))}
+                  onChange={(e) => handlePolicyDetailsChange('coverageAmount', parseFloat(e.target.value))}
                   min={selectedCoverage?.minCoverage}
                   max={selectedCoverage?.maxCoverage}
+                  step={0.5}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Range: {selectedCoverage?.minCoverage.toLocaleString()} - {selectedCoverage?.maxCoverage.toLocaleString()} ALGO
+                  Range: {selectedCoverage?.minCoverage} - {selectedCoverage?.maxCoverage} ALGO
                 </p>
               </div>
               
@@ -322,9 +327,10 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                 <Input
                   type="number"
                   value={policyDetails.deductible}
-                  onChange={(e) => handlePolicyDetailsChange('deductible', parseInt(e.target.value))}
+                  onChange={(e) => handlePolicyDetailsChange('deductible', parseFloat(e.target.value))}
                   min={0}
                   max={policyDetails.coverageAmount * 0.2}
+                  step={0.1}
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Higher deductible = lower premium
@@ -339,14 +345,14 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                       <div key={index} className="flex justify-between">
                         <span className="text-blue-700">{item.label}:</span>
                         <span className="font-medium text-blue-900">
-                          {item.amount >= 0 ? '+' : ''}{item.amount.toFixed(2)} ALGO
+                          {item.amount >= 0 ? '+' : ''}{item.amount.toFixed(3)} ALGO
                         </span>
                       </div>
                     ))}
                     <div className="border-t border-blue-300 pt-2 mt-2">
                       <div className="flex justify-between font-semibold">
                         <span className="text-blue-900">Total Premium:</span>
-                        <span className="text-blue-900">{premiumCalculation.totalPremium.toFixed(2)} ALGO</span>
+                        <span className="text-blue-900">{premiumCalculation.totalPremium.toFixed(3)} ALGO</span>
                       </div>
                     </div>
                   </div>
@@ -378,7 +384,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                 </div>
                 <div>
                   <span className="text-gray-600">Coverage Amount:</span>
-                  <p className="font-medium">{policyDetails.coverageAmount.toLocaleString()} ALGO</p>
+                  <p className="font-medium">{policyDetails.coverageAmount} ALGO</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Duration:</span>
@@ -394,8 +400,11 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold text-gray-900">Total Premium:</span>
                   <span className="text-xl font-bold text-green-600">
-                    {premiumCalculation.totalPremium.toFixed(2)} ALGO
+                    {premiumCalculation.totalPremium.toFixed(3)} ALGO
                   </span>
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Your balance: {balance.toFixed(3)} ALGO
                 </div>
               </div>
             </Card>
@@ -416,8 +425,9 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
                 loading={loading}
                 fullWidth
                 size="lg"
+                disabled={balance < premiumCalculation.totalPremium}
               >
-                Purchase Policy for {premiumCalculation.totalPremium.toFixed(2)} ALGO
+                Purchase Policy for {premiumCalculation.totalPremium.toFixed(3)} ALGO
               </Button>
               
               <p className="text-xs text-gray-500 text-center">
@@ -444,9 +454,9 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
               <h4 className="font-semibold text-green-900 mb-2">Policy Details</h4>
               <div className="space-y-2 text-sm text-green-800">
                 <p><strong>Policy ID:</strong> POL_{Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
-                <p><strong>Coverage:</strong> {policyDetails.coverageAmount.toLocaleString()} ALGO</p>
+                <p><strong>Coverage:</strong> {policyDetails.coverageAmount} ALGO</p>
                 <p><strong>Duration:</strong> {policyDetails.duration} days</p>
-                <p><strong>Premium Paid:</strong> {premiumCalculation.totalPremium.toFixed(2)} ALGO</p>
+                <p><strong>Premium Paid:</strong> {premiumCalculation.totalPremium.toFixed(3)} ALGO</p>
               </div>
             </Card>
             
