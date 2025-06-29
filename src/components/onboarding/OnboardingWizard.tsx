@@ -236,7 +236,8 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
             placeholder="Latitude"
             value={location.lat}
             onChange={(e) => setLocation(prev => ({ ...prev, lat: e.target.value }))}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-800 placeholder-gray-500"
+            style={{ color: '#333333' }}
           />
           <input
             type="number"
@@ -244,7 +245,8 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
             placeholder="Longitude"
             value={location.lng}
             onChange={(e) => setLocation(prev => ({ ...prev, lng: e.target.value }))}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-800 placeholder-gray-500"
+            style={{ color: '#333333' }}
           />
         </div>
 
@@ -253,7 +255,8 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
           placeholder="Farm address (optional)"
           value={location.address}
           onChange={(e) => setLocation(prev => ({ ...prev, address: e.target.value }))}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-800 placeholder-gray-500"
+          style={{ color: '#333333' }}
         />
       </div>
 
@@ -316,7 +319,8 @@ const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onN
             type="text"
             value={profile.name}
             onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-500"
+            style={{ color: '#333333' }}
             placeholder="Enter your full name"
           />
         </div>
@@ -329,7 +333,8 @@ const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onN
             type="tel"
             value={profile.phone}
             onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-500"
+            style={{ color: '#333333' }}
             placeholder="For SMS notifications"
           />
         </div>
@@ -341,7 +346,8 @@ const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onN
           <select
             value={profile.farmSize}
             onChange={(e) => setProfile(prev => ({ ...prev, farmSize: e.target.value }))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800"
+            style={{ color: '#333333' }}
           >
             <option value="">Select farm size</option>
             <option value="small">{"Small (< 2 acres)"}</option>
