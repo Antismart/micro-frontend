@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, User, FileText, CreditCard, CheckCircle, AlertTriangle, Wallet } from 'lucide-react';
+import { Shield, FileText, CreditCard, CheckCircle, AlertTriangle, Wallet } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card } from '../ui/Card';
@@ -21,15 +21,6 @@ interface CoverageOption {
   minCoverage: number;
   maxCoverage: number;
   features: string[];
-}
-
-interface KYCData {
-  fullName: string;
-  idNumber: string;
-  address: string;
-  phone: string;
-  email: string;
-  dateOfBirth: string;
 }
 
 interface PolicyDetails {
@@ -58,14 +49,6 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
     duration: 90,
     deductible: 100,
     additionalRiders: []
-  });
-  const [kycData, setKycData] = useState<KYCData>({
-    fullName: '',
-    idNumber: '',
-    address: '',
-    phone: '',
-    email: '',
-    dateOfBirth: ''
   });
   const [premiumCalculation, setPremiumCalculation] = useState({
     basePremium: 0,
@@ -111,9 +94,8 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
     { id: 1, title: 'Connect Wallet', icon: Wallet },
     { id: 2, title: 'Select Coverage', icon: Shield },
     { id: 3, title: 'Policy Details', icon: FileText },
-    { id: 4, title: 'KYC Verification', icon: User },
-    { id: 5, title: 'Review & Pay', icon: CreditCard },
-    { id: 6, title: 'Confirmation', icon: CheckCircle }
+    { id: 4, title: 'Review & Pay', icon: CreditCard },
+    { id: 5, title: 'Confirmation', icon: CheckCircle }
   ];
 
   const calculatePremium = (coverage: CoverageOption, details: PolicyDetails) => {
@@ -121,7 +103,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
     const durationMultiplier = details.duration / 365;
     const deductibleDiscount = details.deductible / details.coverageAmount * 0.1;
     
-    const riskMultiplier = 1.0; // This would be calculated based on KYC and other factors
+    const riskMultiplier = 1.0; // Simplified risk calculation without KYC
     const totalPremium = basePremium * durationMultiplier * riskMultiplier * (1 - deductibleDiscount);
     
     return {
@@ -154,22 +136,6 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
     }
   };
 
-  const handleKYCSubmit = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // In a real implementation, this would submit KYC data to the smart contract
-      // For now, we'll simulate the process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setCurrentStep(5);
-    } catch (err) {
-      setError('KYC submission failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePurchase = async () => {
     setLoading(true);
     setError(null);
@@ -187,7 +153,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
       // This would interact with the smart contract
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      setCurrentStep(6);
+      setCurrentStep(5);
       
       // Call completion handler
       onComplete({
@@ -389,89 +355,12 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
             </div>
             
             <Button variant="primary" onClick={() => setCurrentStep(4)} fullWidth>
-              Continue to KYC Verification
+              Continue to Review & Payment
             </Button>
           </div>
         );
 
       case 4:
-        return (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">KYC Verification</h3>
-              <p className="text-gray-600">Provide your information for identity verification</p>
-            </div>
-            
-            <div className="space-y-4">
-              <Input
-                label="Full Legal Name"
-                value={kycData.fullName}
-                onChange={(e) => setKycData(prev => ({ ...prev, fullName: e.target.value }))}
-                required
-              />
-              
-              <Input
-                label="Government ID Number"
-                value={kycData.idNumber}
-                onChange={(e) => setKycData(prev => ({ ...prev, idNumber: e.target.value }))}
-                required
-              />
-              
-              <Input
-                label="Address"
-                value={kycData.address}
-                onChange={(e) => setKycData(prev => ({ ...prev, address: e.target.value }))}
-                required
-              />
-              
-              <Input
-                label="Phone Number"
-                type="tel"
-                value={kycData.phone}
-                onChange={(e) => setKycData(prev => ({ ...prev, phone: e.target.value }))}
-                required
-              />
-              
-              <Input
-                label="Email Address"
-                type="email"
-                value={kycData.email}
-                onChange={(e) => setKycData(prev => ({ ...prev, email: e.target.value }))}
-                required
-              />
-              
-              <Input
-                label="Date of Birth"
-                type="date"
-                value={kycData.dateOfBirth}
-                onChange={(e) => setKycData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                required
-              />
-            </div>
-            
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-start space-x-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                <div className="text-sm text-yellow-800">
-                  <p className="font-medium">Privacy Notice</p>
-                  <p>Your information is encrypted and stored securely. We only use this data for identity verification and regulatory compliance.</p>
-                </div>
-              </div>
-            </div>
-            
-            <Button 
-              variant="primary" 
-              onClick={handleKYCSubmit} 
-              loading={loading}
-              disabled={!kycData.fullName || !kycData.idNumber || !kycData.address}
-              fullWidth
-            >
-              Submit KYC Information
-            </Button>
-          </div>
-        );
-
-      case 5:
         return (
           <div className="space-y-6">
             <div className="text-center">
@@ -539,7 +428,7 @@ export const InsurancePurchaseFlow: React.FC<InsurancePurchaseFlowProps> = ({
           </div>
         );
 
-      case 6:
+      case 5:
         return (
           <div className="text-center space-y-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">

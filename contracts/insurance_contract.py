@@ -1,5 +1,5 @@
 """
-MicroCrop Insurance Smart Contract
+MicroCrop Insurance Smart Contract (Simplified - No KYC)
 Handles policy creation, ASA minting, and payout logic on Algorand
 """
 
@@ -102,7 +102,7 @@ def approval_program():
         Approve(),
     ])
     
-    # Handle policy creation
+    # Handle policy creation (simplified without KYC)
     on_create_policy = Seq([
         # Validate inputs
         Assert(Txn.application_args.length() == Int(5)),

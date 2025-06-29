@@ -1,6 +1,6 @@
 /**
  * Insurance Contract Hook
- * Manages interactions with the enhanced insurance smart contract
+ * Manages interactions with the insurance smart contract (KYC functionality removed)
  */
 
 import { useState, useCallback } from 'react';
@@ -13,7 +13,6 @@ interface ContractState {
   totalPayouts: number;
   oracleAddress: string;
   contractAdmin: string;
-  kycRequired: boolean;
   minCoverage: number;
   maxCoverage: number;
 }
@@ -28,13 +27,6 @@ interface PolicyCreationParams {
   historicalClaims: number;
 }
 
-interface KYCSubmissionParams {
-  fullNameHash: string;
-  idDocumentHash: string;
-  addressProofHash: string;
-  contactInfoHash: string;
-}
-
 export const useInsuranceContract = (contractId: number) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +37,8 @@ export const useInsuranceContract = (contractId: number) => {
   const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', '');
 
   const getContractState = useCallback(async () => {
+    if (!contractId) return null;
+    
     try {
       setLoading(true);
       setError(null);
@@ -58,7 +52,6 @@ export const useInsuranceContract = (contractId: number) => {
         totalPayouts: 0,
         oracleAddress: '',
         contractAdmin: '',
-        kycRequired: false,
         minCoverage: 100,
         maxCoverage: 100000
       };
@@ -85,9 +78,6 @@ export const useInsuranceContract = (contractId: number) => {
           case 'contract_admin':
             parsedState.contractAdmin = value;
             break;
-          case 'kyc_required':
-            parsedState.kycRequired = value === 1;
-            break;
           case 'min_coverage':
             parsedState.minCoverage = value;
             break;
@@ -109,47 +99,6 @@ export const useInsuranceContract = (contractId: number) => {
     }
   }, [contractId]);
 
-  const submitKYC = useCallback(async (kycData: KYCSubmissionParams) => {
-    if (!isConnected || !currentAccount) {
-      throw new Error('Wallet not connected');
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const suggestedParams = await algodClient.getTransactionParams().do();
-      
-      const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
-        from: currentAccount,
-        appIndex: contractId,
-        onComplete: algosdk.OnApplicationComplete.NoOpOC,
-        appArgs: [
-          new Uint8Array(Buffer.from('submit_kyc')),
-          new Uint8Array(Buffer.from(kycData.fullNameHash, 'hex')),
-          new Uint8Array(Buffer.from(kycData.idDocumentHash, 'hex')),
-          new Uint8Array(Buffer.from(kycData.addressProofHash, 'hex')),
-          new Uint8Array(Buffer.from(kycData.contactInfoHash, 'hex'))
-        ],
-        suggestedParams
-      });
-
-      const signedTxn = await signTransaction(appCallTxn);
-      const { txId } = await algodClient.sendRawTransaction(signedTxn).do();
-      
-      await waitForTransaction(txId);
-      
-      return { transactionId: txId, success: true };
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'KYC submission failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [isConnected, currentAccount, contractId, signTransaction]);
-
   const createPolicy = useCallback(async (params: PolicyCreationParams, premiumAmount: number) => {
     if (!isConnected || !currentAccount) {
       throw new Error('Wallet not connected');
@@ -169,7 +118,7 @@ export const useInsuranceContract = (contractId: number) => {
         suggestedParams
       });
 
-      // Create application call transaction
+      // Create application call transaction (simplified without KYC)
       const appCallTxn = algosdk.makeApplicationCallTxnFromObject({
         from: currentAccount,
         appIndex: contractId,
@@ -226,7 +175,6 @@ export const useInsuranceContract = (contractId: number) => {
       const localState = {
         activePolicies: 0,
         totalCoverage: 0,
-        kycStatus: 0,
         riskScore: 50
       };
       
@@ -240,9 +188,6 @@ export const useInsuranceContract = (contractId: number) => {
             break;
           case 'total_coverage':
             localState.totalCoverage = value / 1000000; // Convert from microAlgos
-            break;
-          case 'kyc_status':
-            localState.kycStatus = value;
             break;
           case 'risk_score':
             localState.riskScore = value;
@@ -312,7 +257,6 @@ export const useInsuranceContract = (contractId: number) => {
     error,
     contractState,
     getContractState,
-    submitKYC,
     createPolicy,
     getUserLocalState,
     optInToContract,
