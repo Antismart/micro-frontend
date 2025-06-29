@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Shield, Smartphone, MapPin, User, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAlgorand } from '../../hooks/useAlgorand';
 
@@ -11,6 +11,18 @@ interface OnboardingStep {
 
 interface OnboardingWizardProps {
   onComplete: () => void;
+}
+
+interface UserProfile {
+  name: string;
+  phone: string;
+  farmSize: string;
+  location: {
+    lat: string;
+    lng: string;
+    address: string;
+  };
+  completedAt: string;
 }
 
 const WelcomeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
@@ -179,6 +191,12 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
     }
   };
 
+  const handleNext = () => {
+    // Save location to localStorage
+    localStorage.setItem('microcrop_farm_location', JSON.stringify(location));
+    onNext();
+  };
+
   const canContinue = location.lat && location.lng;
 
   return (
@@ -247,7 +265,7 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
           Back
         </button>
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canContinue}
           className="flex-1 bg-orange-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-orange-700 disabled:bg-gray-300 transition-colors"
         >
@@ -260,6 +278,20 @@ const LocationStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ on
 
 const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onNext, onBack }) => {
   const [profile, setProfile] = useState({ name: '', phone: '', farmSize: '' });
+
+  const handleNext = () => {
+    // Save profile to localStorage
+    const userProfile: UserProfile = {
+      name: profile.name,
+      phone: profile.phone,
+      farmSize: profile.farmSize,
+      location: JSON.parse(localStorage.getItem('microcrop_farm_location') || '{}'),
+      completedAt: new Date().toISOString()
+    };
+    
+    localStorage.setItem('microcrop_user_profile', JSON.stringify(userProfile));
+    onNext();
+  };
 
   const canContinue = profile.name.trim();
 
@@ -327,7 +359,7 @@ const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onN
           Back
         </button>
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canContinue}
           className="flex-1 bg-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-purple-700 disabled:bg-gray-300 transition-colors"
         >
@@ -340,14 +372,38 @@ const ProfileStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({ onN
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const { isConnected } = useAlgorand();
 
-  const steps: OnboardingStep[] = [
-    { id: 'welcome', title: 'Welcome', description: 'Introduction to MicroCrop', component: WelcomeStep },
-    { id: 'wallet', title: 'Wallet', description: 'Connect your wallet', component: WalletSetupStep },
-    { id: 'location', title: 'Location', description: 'Set farm location', component: LocationStep },
-    { id: 'profile', title: 'Profile', description: 'Personal information', component: ProfileStep }
-  ];
+  // Check if user has already completed profile setup
+  const hasCompletedProfile = () => {
+    const userProfile = localStorage.getItem('microcrop_user_profile');
+    return userProfile !== null;
+  };
 
+  // Determine which steps to show based on user's completion status
+  const getStepsToShow = (): OnboardingStep[] => {
+    const allSteps: OnboardingStep[] = [
+      { id: 'welcome', title: 'Welcome', description: 'Introduction to MicroCrop', component: WelcomeStep },
+      { id: 'wallet', title: 'Wallet', description: 'Connect your wallet', component: WalletSetupStep },
+      { id: 'location', title: 'Location', description: 'Set farm location', component: LocationStep },
+      { id: 'profile', title: 'Profile', description: 'Personal information', component: ProfileStep }
+    ];
+
+    // If user has completed profile setup, only show welcome and wallet steps
+    if (hasCompletedProfile()) {
+      return allSteps.slice(0, 2); // Only welcome and wallet steps
+    }
+
+    // If wallet is already connected and profile is not complete, skip welcome and wallet
+    if (isConnected && !hasCompletedProfile()) {
+      return allSteps.slice(2); // Only location and profile steps
+    }
+
+    // Show all steps for new users
+    return allSteps;
+  };
+
+  const steps = getStepsToShow();
   const currentStepData = steps[currentStep];
   const StepComponent = currentStepData.component;
 

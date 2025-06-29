@@ -11,20 +11,23 @@ import { useAlgorand } from './hooks/useAlgorand';
 
 function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isFirstVisit, setIsFirstVisit] = useState(true);
   const [currentView, setCurrentView] = useState<'dashboard' | 'marketplace'>('marketplace');
   
   const { isConnected } = useAlgorand();
   const { policies, setError, clearError } = usePolicyStore();
 
-  // Check if user has completed onboarding
+  // Check if user needs onboarding
   useEffect(() => {
     const hasCompletedOnboarding = localStorage.getItem('microcrop_onboarding_completed');
-    const hasExistingPolicies = policies.length > 0;
+    const hasUserProfile = localStorage.getItem('microcrop_user_profile');
     
-    setIsFirstVisit(!hasCompletedOnboarding && !hasExistingPolicies);
-    setShowOnboarding(!hasCompletedOnboarding && !isConnected);
-  }, [isConnected, policies.length]);
+    // Show onboarding if:
+    // 1. User hasn't completed onboarding AND wallet is not connected, OR
+    // 2. User doesn't have a profile (for existing users who need to complete profile)
+    const needsOnboarding = (!hasCompletedOnboarding && !isConnected) || !hasUserProfile;
+    
+    setShowOnboarding(needsOnboarding);
+  }, [isConnected]);
 
   // Preload components for better performance
   useEffect(() => {
@@ -35,15 +38,14 @@ function App() {
   const handleOnboardingComplete = () => {
     localStorage.setItem('microcrop_onboarding_completed', 'true');
     setShowOnboarding(false);
-    setIsFirstVisit(false);
   };
 
   const handleCreatePolicy = () => {
     setCurrentView('marketplace');
   };
 
-  // Show onboarding for new users
-  if (showOnboarding || (!isConnected && isFirstVisit)) {
+  // Show onboarding for new users or users missing profile
+  if (showOnboarding) {
     return (
       <AccessibilityProvider>
         <LocalizationProvider>
