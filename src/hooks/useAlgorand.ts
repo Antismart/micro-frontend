@@ -108,21 +108,47 @@ export const useAlgorand = () => {
       }
       
       // Request new connection to Pera Wallet
-      const accounts = await peraWallet.connect();
-      
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts found. Please make sure you have an Algorand account in Pera Wallet.');
-      }
-      
-      setState(prev => ({
-        ...prev,
-        isConnected: true,
-        accounts,
-        loading: false
-      }));
+      try {
+        const accounts = await peraWallet.connect();
+        
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts found. Please make sure you have an Algorand account in Pera Wallet.');
+        }
+        
+        setState(prev => ({
+          ...prev,
+          isConnected: true,
+          accounts,
+          loading: false
+        }));
 
-      console.log('Successfully connected to Pera Wallet:', accounts[0]);
-      await fetchBalance(accounts[0]);
+        console.log('Successfully connected to Pera Wallet:', accounts[0]);
+        await fetchBalance(accounts[0]);
+        
+      } catch (connectError) {
+        // Handle the case where a session is already connected
+        if (connectError instanceof Error && connectError.message.includes('Session currently connected')) {
+          console.log('Session already connected, retrieving existing accounts');
+          const accounts = peraWallet.connector?.accounts || [];
+          
+          if (accounts.length === 0) {
+            throw new Error('No accounts found in existing session. Please reconnect your wallet.');
+          }
+          
+          setState(prev => ({
+            ...prev,
+            isConnected: true,
+            accounts,
+            loading: false
+          }));
+
+          console.log('Using existing session:', accounts[0]);
+          await fetchBalance(accounts[0]);
+        } else {
+          // Re-throw other connection errors
+          throw connectError;
+        }
+      }
       
     } catch (error) {
       console.error('Wallet connection error:', error);
