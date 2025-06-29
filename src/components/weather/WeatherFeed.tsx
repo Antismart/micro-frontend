@@ -1,7 +1,8 @@
-import React from 'react';
-import { Cloud, Droplets, Thermometer, Wind, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Cloud, Droplets, Thermometer, Wind, AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { WeatherData } from '../../../types';
 import { format } from 'date-fns';
+import { Button } from '../ui/Button';
 
 interface WeatherFeedProps {
   data: WeatherData[];
@@ -13,16 +14,51 @@ interface WeatherFeedProps {
     threshold: number;
     description: string;
   }>;
+  deviceId?: string;
+  onRefresh?: () => void;
 }
 
-export const WeatherFeed: React.FC<WeatherFeedProps> = ({ data, riskLevel, triggers = [] }) => {
+export const WeatherFeed: React.FC<WeatherFeedProps> = ({ 
+  data, 
+  riskLevel, 
+  triggers = [], 
+  deviceId,
+  onRefresh 
+}) => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setRefreshing(true);
+      try {
+        await onRefresh();
+      } finally {
+        setRefreshing(false);
+      }
+    }
+  };
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center py-8">
           <Cloud className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Weather Data</h3>
-          <p className="text-gray-600">Weather information will appear once available</p>
+          <p className="text-gray-600 mb-4">Weather information will appear once available</p>
+          {deviceId && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-md mx-auto">
+              <h4 className="font-medium text-blue-800 mb-2">Using WeatherXM Integration</h4>
+              <p className="text-sm text-blue-700">
+                Weather data is fetched from WeatherXM's decentralized network. 
+                If no data appears, it may be because:
+              </p>
+              <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                <li>• No weather stations are nearby</li>
+                <li>• The device ID needs to be configured</li>
+                <li>• WeatherXM API is temporarily unavailable</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -32,7 +68,7 @@ export const WeatherFeed: React.FC<WeatherFeedProps> = ({ data, riskLevel, trigg
   const last24Hours = data.slice(-24);
   
   const avgTemp = last24Hours.reduce((sum, reading) => sum + reading.temperature, 0) / last24Hours.length;
-  const totalRainfall = last24Hours.reduce((sum, reading) => sum + reading.rainfall, 0);
+  const totalRainfall = last24Hours.reduce((sum, reading) => sum + (reading.rainfall || reading.precipitation || 0), 0);
   const avgHumidity = last24Hours.reduce((sum, reading) => sum + reading.humidity, 0) / last24Hours.length;
   const avgWindSpeed = last24Hours.reduce((sum, reading) => sum + reading.windSpeed, 0) / last24Hours.length;
 
@@ -61,11 +97,25 @@ export const WeatherFeed: React.FC<WeatherFeedProps> = ({ data, riskLevel, trigg
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Weather Monitor</h3>
-            <p className="text-sm text-gray-600">Last updated: {format(new Date(latestReading.timestamp), 'MMM dd, HH:mm')}</p>
+            <p className="text-sm text-gray-600">
+              Last updated: {format(new Date(latestReading.timestamp), 'MMM dd, HH:mm')}
+              {deviceId && <span className="ml-2 text-blue-600">• Device: {deviceId}</span>}
+            </p>
           </div>
-          <div className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${getRiskColor(riskLevel)}`}>
-            <RiskIcon className="w-4 h-4" />
-            <span className="capitalize">{riskLevel} Risk</span>
+          <div className="flex items-center space-x-2">
+            <div className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${getRiskColor(riskLevel)}`}>
+              <RiskIcon className="w-4 h-4" />
+              <span className="capitalize">{riskLevel} Risk</span>
+            </div>
+            {onRefresh && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                loading={refreshing}
+                icon={<RefreshCw className="w-4 h-4" />}
+              />
+            )}
           </div>
         </div>
 
@@ -108,18 +158,39 @@ export const WeatherFeed: React.FC<WeatherFeedProps> = ({ data, riskLevel, trigg
           </div>
         </div>
 
+        {/* Data quality indicator */}
+        {latestReading.qualityScore && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Data Quality</span>
+              <span className="text-sm text-gray-600">{latestReading.qualityScore.toFixed(0)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full ${
+                  latestReading.qualityScore >= 90 ? 'bg-green-600' :
+                  latestReading.qualityScore >= 70 ? 'bg-yellow-600' : 'bg-red-600'
+                }`}
+                style={{ width: `${latestReading.qualityScore}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Rainfall chart */}
         <div className="mb-6">
           <h4 className="text-sm font-medium text-gray-700 mb-3">24-Hour Rainfall Pattern</h4>
           <div className="flex items-end space-x-1 h-20">
             {last24Hours.map((reading, index) => {
-              const height = Math.max((reading.rainfall / Math.max(...last24Hours.map(r => r.rainfall))) * 100, 2);
+              const rainfall = reading.rainfall || reading.precipitation || 0;
+              const maxRainfall = Math.max(...last24Hours.map(r => r.rainfall || r.precipitation || 0));
+              const height = maxRainfall > 0 ? Math.max((rainfall / maxRainfall) * 100, 2) : 2;
               return (
                 <div
                   key={index}
                   className="flex-1 bg-blue-200 rounded-t hover:bg-blue-300 transition-colors"
                   style={{ height: `${height}%` }}
-                  title={`${reading.rainfall.toFixed(1)}mm at ${format(new Date(reading.timestamp), 'HH:mm')}`}
+                  title={`${rainfall.toFixed(1)}mm at ${format(new Date(reading.timestamp), 'HH:mm')}`}
                 />
               );
             })}
@@ -156,6 +227,14 @@ export const WeatherFeed: React.FC<WeatherFeedProps> = ({ data, riskLevel, trigg
             </div>
           </div>
         )}
+
+        {/* WeatherXM attribution */}
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>Powered by WeatherXM Network</span>
+            <span>{data.length} data points</span>
+          </div>
+        </div>
       </div>
     </div>
   );

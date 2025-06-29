@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, TrendingUp, AlertTriangle, Plus, Bell, Settings, RefreshCw } from 'lucide-react';
 import { PolicyStatusCard } from '../policy/PolicyStatusCard';
 import { WeatherFeed } from '../weather/WeatherFeed';
@@ -15,9 +15,10 @@ interface MobileDashboardProps {
 export const MobileDashboard: React.FC<MobileDashboardProps> = ({ onCreatePolicy }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'policies' | 'weather' | 'marketplace'>('overview');
   const [refreshing, setRefreshing] = useState(false);
+  const [weatherDeviceId, setWeatherDeviceId] = useState<string>('test-device-001');
   
   const { policies, getTotalCoverage, loading, error } = usePolicyStore();
-  const { data: weatherData, weatherStats, refetch: refetchWeather } = useWeatherData('test-device', 7);
+  const { data: weatherData, weatherStats, refetch: refetchWeather, findNearbyDevices } = useWeatherData(weatherDeviceId, 7);
 
   const activePolicies = policies.filter(p => p.status === 'active');
   const totalPayouts = policies.reduce((sum, p) => 
@@ -38,6 +39,45 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ onCreatePolicy
     { id: 'marketplace', label: 'Buy Coverage', icon: Plus }
   ];
 
+  // Try to find nearby weather devices on component mount
+  useEffect(() => {
+    const findWeatherDevice = async () => {
+      try {
+        // Get user's location from localStorage if available
+        const userProfile = localStorage.getItem('microcrop_user_profile');
+        const farmLocation = localStorage.getItem('microcrop_farm_location');
+        
+        let lat = 40.7128; // Default to NYC
+        let lng = -74.0060;
+        
+        if (farmLocation) {
+          const location = JSON.parse(farmLocation);
+          lat = parseFloat(location.lat);
+          lng = parseFloat(location.lng);
+        } else if (userProfile) {
+          const profile = JSON.parse(userProfile);
+          if (profile.location) {
+            lat = parseFloat(profile.location.lat);
+            lng = parseFloat(profile.location.lng);
+          }
+        }
+        
+        // Find nearby devices
+        const devices = await findNearbyDevices(lat, lng, 100);
+        if (devices && devices.length > 0) {
+          setWeatherDeviceId(devices[0].deviceId);
+          console.log(`🌤️ Found nearby weather device: ${devices[0].deviceId}`);
+        } else {
+          console.log('🌤️ No nearby weather devices found, using test device');
+        }
+      } catch (error) {
+        console.log('🌤️ Could not find nearby devices, using test device:', error);
+      }
+    };
+
+    findWeatherDevice();
+  }, [findNearbyDevices]);
+
   const handlePurchase = async (cropId: string, coverageAmount: number, duration: number) => {
     try {
       console.log('Purchase:', { cropId, coverageAmount, duration });
@@ -51,7 +91,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ onCreatePolicy
     setRefreshing(true);
     try {
       await refetchWeather();
-      // Add other refresh logic here
     } catch (error) {
       console.error('Refresh failed:', error);
     } finally {
@@ -128,13 +167,13 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ onCreatePolicy
             </div>
 
             {/* Weather Overview */}
-            {weatherData && weatherData.length > 0 && (
-              <WeatherFeed 
-                data={weatherData} 
-                riskLevel="low"
-                triggers={[]}
-              />
-            )}
+            <WeatherFeed 
+              data={weatherData} 
+              riskLevel="low"
+              triggers={[]}
+              deviceId={weatherDeviceId}
+              onRefresh={refetchWeather}
+            />
 
             {/* Recent Policies */}
             <div>
@@ -233,26 +272,27 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ onCreatePolicy
                 Refresh
               </Button>
             </div>
-            {weatherData && weatherData.length > 0 ? (
-              <WeatherFeed 
-                data={weatherData} 
-                riskLevel="low"
-                triggers={[]}
-              />
-            ) : (
-              <Card padding="xl" className="text-center">
-                <AlertTriangle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-medium text-gray-900 mb-2">No Weather Data</h3>
-                <p className="text-gray-600 mb-4">Weather monitoring will be available once you create a policy</p>
-                <Button
-                  variant="primary"
-                  onClick={() => setActiveTab('marketplace')}
-                  icon={<Plus className="w-4 h-4" />}
-                >
-                  Create Policy
-                </Button>
-              </Card>
-            )}
+            
+            <WeatherFeed 
+              data={weatherData} 
+              riskLevel="low"
+              triggers={[]}
+              deviceId={weatherDeviceId}
+              onRefresh={refetchWeather}
+            />
+
+            {/* Weather device info */}
+            <Card padding="md" className="bg-blue-50 border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-2">WeatherXM Integration</h3>
+              <div className="space-y-2 text-sm text-blue-800">
+                <p><strong>Device ID:</strong> {weatherDeviceId}</p>
+                <p><strong>Data Points:</strong> {weatherData.length}</p>
+                <p><strong>Quality Score:</strong> {weatherStats?.qualityScore?.toFixed(0) || 'N/A'}%</p>
+                <p className="text-blue-700">
+                  Weather data is sourced from WeatherXM's decentralized network of weather stations.
+                </p>
+              </div>
+            </Card>
           </div>
         )}
 

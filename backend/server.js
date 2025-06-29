@@ -11,6 +11,7 @@ import { AlgorandService } from './services/AlgorandService.js';
 import { WeatherService } from './services/WeatherService.js';
 import { PolicyService } from './services/PolicyService.js';
 import { PayoutService } from './services/PayoutService.js';
+import weatherRoutes from './routes/weather.js';
 
 dotenv.config();
 
@@ -27,6 +28,9 @@ const weatherService = new WeatherService();
 const policyService = new PolicyService();
 const payoutService = new PayoutService(algorandService, weatherService);
 
+// Routes
+app.use('/api/weather', weatherRoutes);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
@@ -37,6 +41,23 @@ app.get('/health', (req, res) => {
       weatherxm: 'connected'
     }
   });
+});
+
+// WeatherXM health check
+app.get('/api/health/weatherxm', async (req, res) => {
+  try {
+    const healthStatus = weatherService.getHealthStatus();
+    res.json({
+      success: true,
+      health: healthStatus,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Policy management endpoints
@@ -66,37 +87,6 @@ app.get('/api/policies/:farmerId', async (req, res) => {
     res.json({ policies });
   } catch (error) {
     console.error('Policy fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Weather data endpoints
-app.get('/api/weather/:deviceId', async (req, res) => {
-  try {
-    const { deviceId } = req.params;
-    const { days = 7 } = req.query;
-    
-    const weatherData = await weatherService.getWeatherHistory(deviceId, parseInt(days));
-    res.json({ weatherData });
-  } catch (error) {
-    console.error('Weather fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/weather/devices/nearby', async (req, res) => {
-  try {
-    const { lat, lng, radius = 50 } = req.query;
-    
-    const devices = await weatherService.getNearbyDevices(
-      parseFloat(lat), 
-      parseFloat(lng), 
-      parseFloat(radius)
-    );
-    
-    res.json({ devices });
-  } catch (error) {
-    console.error('Device search error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -177,9 +167,23 @@ cron.schedule('*/15 * * * *', async () => {
   }
 });
 
+// WeatherXM health monitoring - runs every 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const healthStatus = weatherService.getHealthStatus();
+    if (!healthStatus.isHealthy) {
+      console.warn('⚠️ WeatherXM service health check failed:', healthStatus);
+    }
+  } catch (error) {
+    console.error('❌ WeatherXM health check failed:', error);
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 MicroCrop Insurance Backend running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌤️ WeatherXM API Key: ${process.env.WEATHERXM_API_KEY ? 'Configured ✅' : 'Missing ❌'}`);
+  console.log(`📡 Weather endpoints: http://localhost:${PORT}/api/weather/*`);
 });
 
 export default app;

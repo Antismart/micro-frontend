@@ -1,16 +1,24 @@
 /**
- * WeatherXM Integration Service
- * Handles weather data fetching and analysis
+ * Weather Service - Updated to use WeatherXM integration
+ * Handles weather data fetching and analysis for insurance policies
  */
 
-import axios from 'axios';
+import { WeatherXMService } from './WeatherXMService.js';
 
 export class WeatherService {
   constructor() {
-    this.baseURL = 'https://api.weatherxm.com/api/v1';
-    this.apiKey = process.env.WEATHERXM_API_KEY;
+    this.weatherXM = new WeatherXMService();
     this.cache = new Map();
     this.cacheTimeout = 15 * 60 * 1000; // 15 minutes
+    
+    // Set up event listeners
+    this.weatherXM.on('weatherDataReceived', (data) => {
+      console.log(`📊 Weather data received for device ${data.deviceId}`);
+    });
+    
+    this.weatherXM.on('healthCheckFailed', (status) => {
+      console.warn('⚠️ WeatherXM health check failed:', status);
+    });
   }
 
   /**
@@ -18,31 +26,23 @@ export class WeatherService {
    */
   async getNearbyDevices(lat, lng, radius = 50) {
     try {
-      const response = await axios.get(`${this.baseURL}/devices`, {
-        params: {
-          lat,
-          lng,
-          radius,
-          limit: 20
-        },
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`
-        }
-      });
-
-      return response.data.map(device => ({
-        deviceId: device.id,
+      const devices = await this.weatherXM.getNearbyDevices(lat, lng, radius);
+      
+      return devices.map(device => ({
+        deviceId: device.deviceId,
         name: device.name,
         location: {
           lat: device.location.lat,
           lng: device.location.lng,
           address: device.location.address
         },
-        lastSeen: device.last_seen,
+        lastSeen: device.lastSeen,
         status: device.status,
-        distance: this.calculateDistance(lat, lng, device.location.lat, device.location.lng)
+        distance: device.distance,
+        dataQuality: device.dataQuality
       }));
     } catch (error) {
+      console.error('Failed to fetch nearby devices:', error);
       throw new Error(`Failed to fetch nearby devices: ${error.message}`);
     }
   }
@@ -62,27 +62,12 @@ export class WeatherService {
       const endDate = new Date();
       const startDate = new Date(endDate.getTime() - (days * 24 * 60 * 60 * 1000));
       
-      const response = await axios.get(`${this.baseURL}/devices/${deviceId}/data`, {
-        params: {
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          granularity: 'hourly'
-        },
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`
-        }
-      });
-
-      const weatherData = response.data.map(reading => ({
-        deviceId,
-        timestamp: new Date(reading.timestamp).getTime(),
-        temperature: reading.temperature,
-        humidity: reading.humidity,
-        rainfall: reading.precipitation,
-        windSpeed: reading.wind_speed,
-        pressure: reading.pressure,
-        solarRadiation: reading.solar_radiation
-      }));
+      const weatherData = await this.weatherXM.getHistoricalWeather(
+        deviceId, 
+        startDate, 
+        endDate, 
+        'hourly'
+      );
 
       // Cache the result
       this.cache.set(cacheKey, {
@@ -92,6 +77,13 @@ export class WeatherService {
 
       return weatherData;
     } catch (error) {
+      console.error('Failed to fetch weather history:', error);
+      
+      // Return mock data for testing if WeatherXM is unavailable
+      if (process.env.NODE_ENV === 'development') {
+        return this.generateMockWeatherData(deviceId, days);
+      }
+      
       throw new Error(`Failed to fetch weather history: ${error.message}`);
     }
   }
@@ -101,24 +93,16 @@ export class WeatherService {
    */
   async getCurrentWeather(deviceId) {
     try {
-      const response = await axios.get(`${this.baseURL}/devices/${deviceId}/current`, {
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`
-        }
-      });
-
-      const reading = response.data;
-      return {
-        deviceId,
-        timestamp: new Date(reading.timestamp).getTime(),
-        temperature: reading.temperature,
-        humidity: reading.humidity,
-        rainfall: reading.precipitation,
-        windSpeed: reading.wind_speed,
-        pressure: reading.pressure,
-        solarRadiation: reading.solar_radiation
-      };
+      const weatherData = await this.weatherXM.getCurrentWeather(deviceId);
+      return weatherData;
     } catch (error) {
+      console.error('Failed to fetch current weather:', error);
+      
+      // Return mock data for testing if WeatherXM is unavailable
+      if (process.env.NODE_ENV === 'development') {
+        return this.generateMockCurrentWeather(deviceId);
+      }
+      
       throw new Error(`Failed to fetch current weather: ${error.message}`);
     }
   }
@@ -127,117 +111,95 @@ export class WeatherService {
    * Analyze weather conditions for insurance triggers
    */
   analyzeWeatherConditions(weatherData, cropType, thresholds) {
-    const analysis = {
-      triggers: [],
-      riskLevel: 'low',
-      recommendations: []
-    };
-
-    // Calculate averages and extremes
-    const temperatures = weatherData.map(d => d.temperature);
-    const rainfalls = weatherData.map(d => d.rainfall);
-    
-    const avgTemp = temperatures.reduce((a, b) => a + b, 0) / temperatures.length;
-    const maxTemp = Math.max(...temperatures);
-    const minTemp = Math.min(...temperatures);
-    const totalRainfall = rainfalls.reduce((a, b) => a + b, 0);
-    const avgRainfall = totalRainfall / rainfalls.length;
-
-    // Drought conditions
-    if (totalRainfall < thresholds.minMonthlyRainfall) {
-      analysis.triggers.push({
-        type: 'drought',
-        severity: totalRainfall < (thresholds.minMonthlyRainfall * 0.5) ? 'severe' : 'moderate',
-        value: totalRainfall,
-        threshold: thresholds.minMonthlyRainfall,
-        description: `Total rainfall (${totalRainfall.toFixed(1)}mm) below minimum threshold`
-      });
-    }
-
-    // Excessive heat
-    if (maxTemp > thresholds.maxTemperature) {
-      analysis.triggers.push({
-        type: 'excessive_heat',
-        severity: maxTemp > (thresholds.maxTemperature + 5) ? 'severe' : 'moderate',
-        value: maxTemp,
-        threshold: thresholds.maxTemperature,
-        description: `Maximum temperature (${maxTemp.toFixed(1)}°C) exceeded threshold`
-      });
-    }
-
-    // Excessive rainfall (flooding)
-    const dailyRainfalls = this.calculateDailyTotals(weatherData, 'rainfall');
-    const maxDailyRainfall = Math.max(...dailyRainfalls);
-    
-    if (maxDailyRainfall > thresholds.maxDailyRainfall) {
-      analysis.triggers.push({
-        type: 'flooding',
-        severity: maxDailyRainfall > (thresholds.maxDailyRainfall * 1.5) ? 'severe' : 'moderate',
-        value: maxDailyRainfall,
-        threshold: thresholds.maxDailyRainfall,
-        description: `Daily rainfall (${maxDailyRainfall.toFixed(1)}mm) exceeded flooding threshold`
-      });
-    }
-
-    // Determine overall risk level
-    const severeTriggers = analysis.triggers.filter(t => t.severity === 'severe');
-    const moderateTriggers = analysis.triggers.filter(t => t.severity === 'moderate');
-
-    if (severeTriggers.length > 0) {
-      analysis.riskLevel = 'high';
-    } else if (moderateTriggers.length > 1) {
-      analysis.riskLevel = 'medium';
-    }
-
-    return analysis;
+    return this.weatherXM.analyzeWeatherConditions(weatherData, cropType, thresholds);
   }
 
   /**
-   * Calculate daily totals from hourly data
+   * Generate mock weather data for testing
    */
-  calculateDailyTotals(weatherData, field) {
-    const dailyTotals = {};
+  generateMockWeatherData(deviceId, days) {
+    const mockData = [];
+    const now = Date.now();
     
-    weatherData.forEach(reading => {
-      const date = new Date(reading.timestamp).toDateString();
-      if (!dailyTotals[date]) {
-        dailyTotals[date] = 0;
+    for (let i = 0; i < days * 24; i++) {
+      const timestamp = now - (i * 60 * 60 * 1000); // Hourly data
+      
+      mockData.push({
+        deviceId,
+        timestamp,
+        temperature: 20 + Math.random() * 15, // 20-35°C
+        humidity: 40 + Math.random() * 40, // 40-80%
+        rainfall: Math.random() < 0.3 ? Math.random() * 10 : 0, // 30% chance of rain
+        precipitation: Math.random() < 0.3 ? Math.random() * 10 : 0,
+        windSpeed: Math.random() * 20, // 0-20 m/s
+        windDirection: Math.random() * 360,
+        pressure: 1000 + Math.random() * 50, // 1000-1050 hPa
+        solarRadiation: Math.random() * 1000,
+        uvIndex: Math.random() * 12,
+        qualityScore: 85 + Math.random() * 15, // 85-100%
+        location: {
+          lat: 40.7128 + (Math.random() - 0.5) * 0.1,
+          lng: -74.0060 + (Math.random() - 0.5) * 0.1,
+          address: `Test Location ${deviceId}`
+        }
+      });
+    }
+    
+    return mockData.reverse(); // Oldest first
+  }
+
+  /**
+   * Generate mock current weather data for testing
+   */
+  generateMockCurrentWeather(deviceId) {
+    return {
+      deviceId,
+      timestamp: Date.now(),
+      temperature: 25 + Math.random() * 10,
+      humidity: 50 + Math.random() * 30,
+      rainfall: Math.random() < 0.2 ? Math.random() * 5 : 0,
+      precipitation: Math.random() < 0.2 ? Math.random() * 5 : 0,
+      windSpeed: Math.random() * 15,
+      windDirection: Math.random() * 360,
+      pressure: 1010 + Math.random() * 20,
+      solarRadiation: Math.random() * 800,
+      uvIndex: Math.random() * 10,
+      qualityScore: 90 + Math.random() * 10,
+      location: {
+        lat: 40.7128,
+        lng: -74.0060,
+        address: `Test Location ${deviceId}`
       }
-      dailyTotals[date] += reading[field] || 0;
-    });
-    
-    return Object.values(dailyTotals);
-  }
-
-  /**
-   * Calculate distance between two coordinates
-   */
-  calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRad(lat2 - lat1);
-    const dLng = this.toRad(lng2 - lng1);
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  /**
-   * Convert degrees to radians
-   */
-  toRad(degrees) {
-    return degrees * (Math.PI / 180);
+    };
   }
 
   /**
    * Sync data for all active devices
    */
   async syncAllDeviceData() {
-    // This would be implemented to sync data for all devices
-    // that have active policies associated with them
-    console.log('Syncing weather data for all active devices...');
+    console.log('🔄 Syncing weather data for all active devices...');
+    
+    try {
+      // In a real implementation, this would sync data for all devices
+      // that have active policies associated with them
+      const healthStatus = this.weatherXM.getHealthStatus();
+      console.log('📊 WeatherXM Health Status:', healthStatus);
+      
+      return {
+        success: true,
+        syncedDevices: 0,
+        healthStatus
+      };
+    } catch (error) {
+      console.error('❌ Data sync failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get service health status
+   */
+  getHealthStatus() {
+    return this.weatherXM.getHealthStatus();
   }
 }
