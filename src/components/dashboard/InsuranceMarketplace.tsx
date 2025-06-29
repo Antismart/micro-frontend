@@ -9,15 +9,43 @@ import { useAlgorand } from '../../hooks/useAlgorand';
 export const InsuranceMarketplace: React.FC = () => {
   const [showPurchaseFlow, setShowPurchaseFlow] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [contractId, setContractId] = useState<number | null>(null);
   
   const { isConnected } = useAlgorand();
-  const { contractState, getContractState, loading } = useInsuranceContract(123456); // Replace with actual contract ID
+  
+  // Load contract ID from contract-info.json or environment
+  useEffect(() => {
+    const loadContractId = async () => {
+      try {
+        // Try to load from contract-info.json first
+        const response = await fetch('/contract-info.json');
+        if (response.ok) {
+          const contractInfo = await response.json();
+          if (contractInfo.appId) {
+            setContractId(contractInfo.appId);
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('No contract-info.json found, contract not deployed yet');
+      }
+      
+      // Fallback: check if CONTRACT_ID is set in environment
+      // In a real app, this would come from your backend API
+      // For now, we'll leave it as null to show the deployment message
+      setContractId(null);
+    };
+    
+    loadContractId();
+  }, []);
+
+  const { contractState, getContractState, loading } = useInsuranceContract(contractId || 0);
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && contractId) {
       getContractState();
     }
-  }, [isConnected, getContractState]);
+  }, [isConnected, contractId, getContractState]);
 
   const insuranceCategories = [
     {
@@ -100,8 +128,10 @@ export const InsuranceMarketplace: React.FC = () => {
   const handlePolicyComplete = (policyData: any) => {
     console.log('Policy created:', policyData);
     setShowPurchaseFlow(false);
-    // Refresh contract state
-    getContractState();
+    // Refresh contract state if contract is deployed
+    if (contractId) {
+      getContractState();
+    }
   };
 
   const getRiskColor = (level: string) => {
@@ -112,6 +142,84 @@ export const InsuranceMarketplace: React.FC = () => {
       default: return 'text-gray-600 bg-gray-100';
     }
   };
+
+  // Show contract deployment message if no contract ID is available
+  if (!contractId) {
+    return (
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <h1 className="text-3xl font-bold text-gray-900">Insurance Marketplace</h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Decentralized insurance powered by Algorand blockchain. 
+            Transparent, automated, and secure coverage for your agricultural needs.
+          </p>
+        </div>
+
+        {/* Contract Deployment Notice */}
+        <Card padding="lg" className="max-w-2xl mx-auto">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+              <FileText className="w-8 h-8 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Smart Contract Setup Required</h2>
+              <p className="text-gray-600 mb-4">
+                The insurance smart contract needs to be deployed to the Algorand blockchain before you can purchase policies.
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+              <h3 className="font-semibold text-blue-800 mb-2">Deployment Steps:</h3>
+              <ol className="space-y-2 text-blue-700 text-sm">
+                <li>1. Set your <code className="bg-blue-100 px-1 rounded">CREATOR_MNEMONIC</code> environment variable</li>
+                <li>2. Run <code className="bg-blue-100 px-1 rounded">npm run compile-contracts</code></li>
+                <li>3. Run <code className="bg-blue-100 px-1 rounded">npm run deploy-contract</code></li>
+                <li>4. Update the contract ID in your configuration</li>
+                <li>5. Restart the application</li>
+              </ol>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium">Note:</p>
+                  <p>Make sure you have TestNet ALGO in your creator account for deployment fees.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Preview of Insurance Categories (disabled) */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900 text-center">Available Insurance Types</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 opacity-50">
+            {insuranceCategories.map((category) => (
+              <Card key={category.id} padding="md" className="cursor-not-allowed">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-3xl">{category.icon}</div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">{category.name}</h3>
+                      <p className="text-gray-600">{category.description}</p>
+                    </div>
+                  </div>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskColor(category.riskLevel)}`}>
+                    {category.riskLevel} Risk
+                  </div>
+                </div>
+                <div className="text-center py-4">
+                  <p className="text-gray-500">Available after contract deployment</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
