@@ -54,6 +54,12 @@ const WalletSetupStep: React.FC<{ onNext: () => void; onBack: () => void }> = ({
   const { connectWallet, isConnected, loading, error } = useAlgorand();
   
   const handleConnect = async () => {
+    // Check if wallet is already connected
+    if (isConnected) {
+      onNext();
+      return;
+    }
+    
     await connectWallet();
     // Only proceed if connection was successful
     if (!loading && !error) {
